@@ -1,3 +1,9 @@
+<<<<<<< HEAD
 Flask 
 Flask-Cors 
 pymysql 
+=======
+Flask
+Flask-Cors
+gunicorn
+>>>>>>> e27e92b518895304f16759daf36034c59cf1fad1

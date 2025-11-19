@@ -12,7 +12,7 @@ CORS(app)
 db = pymysql.connect(
     host="srv-db2045.hstgr.io",          # ← your Hostinger DB host
     user="u497160458",                   # ← your Hostinger DB username
-    password="Attendence@557",         # ← CHANGE THIS
+    password="YOUR_DB_PASSWORD",         # ← CHANGE THIS
     database="u497160458_attendance_db"  # ← your Hostinger DB name
 )
 
@@ -206,3 +206,5 @@ def dashboard_stats():
 # ================================
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
+
+
