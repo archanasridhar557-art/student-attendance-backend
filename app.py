@@ -1,22 +1,24 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import pymysql
+import os
 import datetime
 
 app = Flask(__name__)
 CORS(app)
 
 # ================================
-# ✅ CONNECT TO HOSTINGER DATABASE
+# ✅ CONNECT TO RAILWAY DATABASE
 # ================================
-db = pymysql.connect(
-    host="srv-db2045.hstgr.io",          # ← your Hostinger DB host
-    user="u497160458",                   # ← your Hostinger DB username
-    password="YOUR_DB_PASSWORD",         # ← CHANGE THIS
-    database="u497160458_attendance_db"  # ← your Hostinger DB name
-)
-
-cursor = db.cursor()
+def get_db():
+    return pymysql.connect(
+        host=os.getenv("DB_HOST"),
+        user=os.getenv("DB_USER"),
+        password=os.getenv("DB_PASS"),
+        database=os.getenv("DB_NAME"),
+        port=int(os.getenv("DB_PORT")),
+        cursorclass=pymysql.cursors.DictCursor
+    )
 
 
 # ================================
@@ -24,7 +26,7 @@ cursor = db.cursor()
 # ================================
 @app.route('/')
 def home():
-    return "🚀 Smart Attendance Backend Connected to MySQL"
+    return "🚀 Smart Attendance Backend Connected to Railway MySQL"
 
 
 # ================================
@@ -36,11 +38,16 @@ def admin_login():
     email = data.get("email")
     password = data.get("password")
 
+    db = get_db()
+    cursor = db.cursor()
+
     cursor.execute(
         "SELECT * FROM admins WHERE email=%s AND password=%s",
         (email, password)
     )
     admin = cursor.fetchone()
+    cursor.close()
+    db.close()
 
     if admin:
         return jsonify({"success": True, "token": "admin_token"}), 200
@@ -57,11 +64,16 @@ def teacher_login():
     email = data.get("email")
     password = data.get("password")
 
+    db = get_db()
+    cursor = db.cursor()
+
     cursor.execute(
         "SELECT * FROM teachers WHERE email=%s AND password=%s",
         (email, password)
     )
     teacher = cursor.fetchone()
+    cursor.close()
+    db.close()
 
     if teacher:
         return jsonify({"success": True, "token": "teacher_token"}), 200
@@ -74,19 +86,16 @@ def teacher_login():
 # ================================
 @app.route('/get-students', methods=['GET'])
 def get_students():
+    db = get_db()
+    cursor = db.cursor()
+
     cursor.execute("SELECT * FROM students")
     rows = cursor.fetchall()
 
-    students_list = []
-    for s in rows:
-        students_list.append({
-            "id": s[0],
-            "name": s[1],
-            "roll": s[2],
-            "branch": s[3]
-        })
+    cursor.close()
+    db.close()
 
-    return jsonify(students_list)
+    return jsonify(rows)
 
 
 # ================================
@@ -99,10 +108,15 @@ def add_student():
     roll = data["roll"]
     branch = data["branch"]
 
-    # Prevent duplicate roll
+    db = get_db()
+    cursor = db.cursor()
+
     cursor.execute("SELECT * FROM students WHERE roll=%s", (roll,))
     exists = cursor.fetchone()
+
     if exists:
+        cursor.close()
+        db.close()
         return jsonify({"message": "Student with this roll already exists"}), 400
 
     cursor.execute(
@@ -110,6 +124,9 @@ def add_student():
         (name, roll, branch)
     )
     db.commit()
+
+    cursor.close()
+    db.close()
 
     return jsonify({"message": "Student added successfully"}), 200
 
@@ -119,8 +136,15 @@ def add_student():
 # ================================
 @app.route('/delete-student/<roll>', methods=['DELETE'])
 def delete_student(roll):
+    db = get_db()
+    cursor = db.cursor()
+
     cursor.execute("DELETE FROM students WHERE roll=%s", (roll,))
     db.commit()
+
+    cursor.close()
+    db.close()
+
     return jsonify({"message": "Student deleted successfully"}), 200
 
 
@@ -135,7 +159,9 @@ def mark_attendance():
 
     today = datetime.datetime.now().strftime("%Y-%m-%d")
 
-    # Prevent double entry
+    db = get_db()
+    cursor = db.cursor()
+
     cursor.execute(
         "SELECT * FROM attendance WHERE roll=%s AND date=%s",
         (roll, today)
@@ -143,6 +169,8 @@ def mark_attendance():
     exists = cursor.fetchone()
 
     if exists:
+        cursor.close()
+        db.close()
         return jsonify({"message": f"{name} already marked today"}), 200
 
     cursor.execute(
@@ -150,6 +178,9 @@ def mark_attendance():
         (name, roll, today)
     )
     db.commit()
+
+    cursor.close()
+    db.close()
 
     return jsonify({"message": f"{name} marked present"}), 200
 
@@ -159,20 +190,16 @@ def mark_attendance():
 # ================================
 @app.route('/attendance-history', methods=['GET'])
 def attendance_history():
+    db = get_db()
+    cursor = db.cursor()
+
     cursor.execute("SELECT * FROM attendance ORDER BY date DESC")
     rows = cursor.fetchall()
 
-    attendance_list = []
-    for a in rows:
-        attendance_list.append({
-            "id": a[0],
-            "name": a[1],
-            "roll": a[2],
-            "date": str(a[3]),
-            "time": str(a[4])
-        })
+    cursor.close()
+    db.close()
 
-    return jsonify(attendance_list)
+    return jsonify(rows)
 
 
 # ================================
@@ -180,15 +207,21 @@ def attendance_history():
 # ================================
 @app.route('/dashboard-stats', methods=['GET'])
 def dashboard_stats():
-    cursor.execute("SELECT COUNT(*) FROM students")
-    total_students = cursor.fetchone()[0]
+    db = get_db()
+    cursor = db.cursor()
+
+    cursor.execute("SELECT COUNT(*) AS total FROM students")
+    total_students = cursor.fetchone()["total"]
 
     today = datetime.datetime.now().strftime("%Y-%m-%d")
 
-    cursor.execute("SELECT COUNT(*) FROM attendance WHERE date=%s", (today,))
-    todays_attendance = cursor.fetchone()[0]
+    cursor.execute("SELECT COUNT(*) AS present FROM attendance WHERE date=%s", (today,))
+    todays_attendance = cursor.fetchone()["present"]
 
     absent = total_students - todays_attendance
+
+    cursor.close()
+    db.close()
 
     return jsonify({
         "success": True,
@@ -202,9 +235,7 @@ def dashboard_stats():
 
 
 # ================================
-# 🚀 RUN SERVER
+# 🚀 RUN SERVER (LOCAL)
 # ================================
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
-
-
