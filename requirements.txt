@@ -4,3 +4,4 @@ pymysql
 gunicorn
 opencv-contrib-python
 numpy
+cryptography
