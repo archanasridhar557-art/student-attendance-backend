@@ -22,11 +22,9 @@ def get_db():
         database=os.getenv("MYSQLDATABASE"),
         port=int(os.getenv("MYSQLPORT")),
         cursorclass=pymysql.cursors.DictCursor,
-        ssl={"ssl": {}},                      # Needed for Railway
-        auth_plugin_map={
-            "*": "mysql_native_password"      # Fixes caching_sha2_password error
-        }
+        ssl={"ssl": {}}  # Required for Railway
     )
+
 
 
 
