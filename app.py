@@ -408,33 +408,29 @@ print("Using DB at:", os.path.abspath(DB_PATH))#remove
 # ================================
 # 🌱 SEED DEFAULT ADMIN & TEACHER
 # ================================
-@app.route('/seed-users', methods=['POST'])
+@app.route('/seed-users', methods=['GET'])
 def seed_users():
     conn = get_db()
     cursor = conn.cursor()
 
-    # default admin
+    # Insert default admin
     cursor.execute(
         "INSERT OR IGNORE INTO admins (email, password) VALUES (?, ?)",
-        ("admin@gmail.com", "admin123")
+        ("admin@test.com", "admin123")
     )
 
-    # default teacher
+    # Insert default teacher
     cursor.execute(
         "INSERT OR IGNORE INTO teachers (email, password) VALUES (?, ?)",
-        ("teacher@gmail.com", "teacher123")
+        ("teacher@test.com", "teacher123")
     )
 
     conn.commit()
     cursor.close()
     conn.close()
 
-    return jsonify({
-        "success": True,
-        "message": "Default admin and teacher created (if they didn't already exist).",
-        "admin": {"email": "admin@gmail.com", "password": "admin123"},
-        "teacher": {"email": "teacher@gmail.com", "password": "teacher123"}
-    }), 200
+    return jsonify({"message": "Default admin & teacher created"}), 200
+
 
 
 # ================================
