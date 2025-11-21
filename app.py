@@ -21,8 +21,10 @@ def get_db():
         password=os.getenv("MYSQLPASSWORD"),
         database=os.getenv("MYSQLDATABASE"),
         port=int(os.getenv("MYSQLPORT")),
-        cursorclass=pymysql.cursors.DictCursor
+        cursorclass=pymysql.cursors.DictCursor,
+        ssl={"ssl": {}}  # REQUIRED for Railway MySQL
     )
+
 
 
 
