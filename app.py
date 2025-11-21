@@ -484,6 +484,17 @@ def recognize_face():
         "message": msg
     }), 200
 
+#temp
+@app.route('/env')
+def env_test():
+    return {
+        "MYSQLHOST": os.getenv("MYSQLHOST"),
+        "MYSQLUSER": os.getenv("MYSQLUSER"),
+        "MYSQLPASSWORD": os.getenv("MYSQLPASSWORD"),
+        "MYSQLDATABASE": os.getenv("MYSQLDATABASE"),
+        "MYSQLPORT": os.getenv("MYSQLPORT")
+    }
+
 
 # ================================
 # 🚀 RUN SERVER (LOCAL)
