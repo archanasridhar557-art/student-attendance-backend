@@ -13,6 +13,10 @@ CORS(app)
 
 DB_PATH = "database.db"
 
+with app.app_context():
+    init_db()
+
+
 # ================================
 # ✅ CONNECT TO SQLITE DATABASE
 # ================================
@@ -400,10 +404,12 @@ def recognize_face():
         "message": msg
     }), 200
 
+print("Using DB at:", os.path.abspath(DB_PATH))#remove
 
 # ================================
 # 🔧 INIT DB (CREATE TABLES)
 # ================================
+
 def init_db():
     conn = get_db()
     cursor = conn.cursor()
