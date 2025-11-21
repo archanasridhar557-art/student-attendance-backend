@@ -495,16 +495,19 @@ def env_test():
         "MYSQLPORT": os.getenv("MYSQLPORT")
     }
 
-#temp
 @app.route("/tables")
 def tables():
     try:
-        cursor = conn.cursor()
+        db = get_db()
+        cursor = db.cursor()
         cursor.execute("SHOW TABLES;")
         result = cursor.fetchall()
+        cursor.close()
+        db.close()
         return {"tables": result}
     except Exception as e:
         return {"error": str(e)}
+
 
 
 
