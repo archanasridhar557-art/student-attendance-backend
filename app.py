@@ -24,17 +24,6 @@ def get_db():
         cursorclass=pymysql.cursors.DictCursor,
         ssl={"ssl": {}}  # Required for Railway
     )
-#temp
-@app.route("/tables")
-def tables():
-    try:
-        cursor = conn.cursor()
-        cursor.execute("SHOW TABLES;")
-        result = cursor.fetchall()
-        return {"tables": result}
-    except Exception as e:
-        return {"error": str(e)}
-
 
 
 # ================================
@@ -505,6 +494,18 @@ def env_test():
         "MYSQLDATABASE": os.getenv("MYSQLDATABASE"),
         "MYSQLPORT": os.getenv("MYSQLPORT")
     }
+
+#temp
+@app.route("/tables")
+def tables():
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SHOW TABLES;")
+        result = cursor.fetchall()
+        return {"tables": result}
+    except Exception as e:
+        return {"error": str(e)}
+
 
 
 # ================================
