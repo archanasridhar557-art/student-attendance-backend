@@ -22,7 +22,7 @@ def get_db():
         database=os.getenv("MYSQLDATABASE"),
         port=int(os.getenv("MYSQLPORT")),
         cursorclass=pymysql.cursors.DictCursor,
-        ssl={"ssl": {}}  # REQUIRED for Railway MySQL
+        ssl={"ssl": {}}  # required for Railway
     )
 
 
