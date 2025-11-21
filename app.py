@@ -1,29 +1,25 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-import pymysql
 import os
 import datetime
 import cv2
 import numpy as np
 import base64
 import time
+import sqlite3
 
 app = Flask(__name__)
 CORS(app)
 
+DB_PATH = "database.db"
+
 # ================================
-# ✅ CONNECT TO RAILWAY DATABASE
+# ✅ CONNECT TO SQLITE DATABASE
 # ================================
 def get_db():
-    return pymysql.connect(
-        host=os.getenv("MYSQLHOST"),
-        user=os.getenv("MYSQLUSER"),
-        password=os.getenv("MYSQLPASSWORD"),
-        database=os.getenv("MYSQLDATABASE"),
-        port=int(os.getenv("MYSQLPORT")),
-        cursorclass=pymysql.cursors.DictCursor,
-        ssl={"ssl": {}}  # Required for Railway
-    )
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row  # so we can use dict(row)
+    return conn
 
 
 # ================================
@@ -31,7 +27,7 @@ def get_db():
 # ================================
 @app.route('/')
 def home():
-    return "🚀 Smart Attendance Backend Connected to Railway MySQL"
+    return "🚀 Smart Attendance Backend Connected to SQLite"
 
 
 # ================================
@@ -43,16 +39,16 @@ def admin_login():
     email = data.get("email")
     password = data.get("password")
 
-    db = get_db()
-    cursor = db.cursor()
+    conn = get_db()
+    cursor = conn.cursor()
 
     cursor.execute(
-        "SELECT * FROM admins WHERE email=%s AND password=%s",
+        "SELECT * FROM admins WHERE email=? AND password=?",
         (email, password)
     )
     admin = cursor.fetchone()
     cursor.close()
-    db.close()
+    conn.close()
 
     if admin:
         return jsonify({"success": True, "token": "admin_token"}), 200
@@ -69,16 +65,16 @@ def teacher_login():
     email = data.get("email")
     password = data.get("password")
 
-    db = get_db()
-    cursor = db.cursor()
+    conn = get_db()
+    cursor = conn.cursor()
 
     cursor.execute(
-        "SELECT * FROM teachers WHERE email=%s AND password=%s",
+        "SELECT * FROM teachers WHERE email=? AND password=?",
         (email, password)
     )
     teacher = cursor.fetchone()
     cursor.close()
-    db.close()
+    conn.close()
 
     if teacher:
         return jsonify({"success": True, "token": "teacher_token"}), 200
@@ -91,16 +87,18 @@ def teacher_login():
 # ================================
 @app.route('/get-students', methods=['GET'])
 def get_students():
-    db = get_db()
-    cursor = db.cursor()
+    conn = get_db()
+    cursor = conn.cursor()
 
     cursor.execute("SELECT * FROM students")
     rows = cursor.fetchall()
 
     cursor.close()
-    db.close()
+    conn.close()
 
-    return jsonify(rows)
+    # convert sqlite Row objects to dict
+    students = [dict(row) for row in rows]
+    return jsonify(students)
 
 
 # ================================
@@ -113,25 +111,26 @@ def add_student():
     roll = data["roll"]
     branch = data["branch"]
 
-    db = get_db()
-    cursor = db.cursor()
+    conn = get_db()
+    cursor = conn.cursor()
 
-    cursor.execute("SELECT * FROM students WHERE roll=%s", (roll,))
+    # Prevent duplicate roll
+    cursor.execute("SELECT * FROM students WHERE roll=?", (roll,))
     exists = cursor.fetchone()
 
     if exists:
         cursor.close()
-        db.close()
+        conn.close()
         return jsonify({"message": "Student with this roll already exists"}), 400
 
     cursor.execute(
-        "INSERT INTO students (name, roll, branch) VALUES (%s, %s, %s)",
+        "INSERT INTO students (name, roll, branch) VALUES (?, ?, ?)",
         (name, roll, branch)
     )
-    db.commit()
+    conn.commit()
 
     cursor.close()
-    db.close()
+    conn.close()
 
     return jsonify({"message": "Student added successfully"}), 200
 
@@ -141,14 +140,14 @@ def add_student():
 # ================================
 @app.route('/delete-student/<roll>', methods=['DELETE'])
 def delete_student(roll):
-    db = get_db()
-    cursor = db.cursor()
+    conn = get_db()
+    cursor = conn.cursor()
 
-    cursor.execute("DELETE FROM students WHERE roll=%s", (roll,))
-    db.commit()
+    cursor.execute("DELETE FROM students WHERE roll=?", (roll,))
+    conn.commit()
 
     cursor.close()
-    db.close()
+    conn.close()
 
     return jsonify({"message": "Student deleted successfully"}), 200
 
@@ -163,29 +162,31 @@ def mark_attendance():
     roll = data["roll"]
 
     today = datetime.datetime.now().strftime("%Y-%m-%d")
+    now_time = datetime.datetime.now().strftime("%H:%M:%S")
 
-    db = get_db()
-    cursor = db.cursor()
+    conn = get_db()
+    cursor = conn.cursor()
 
+    # Prevent double entry
     cursor.execute(
-        "SELECT * FROM attendance WHERE roll=%s AND date=%s",
+        "SELECT * FROM attendance WHERE roll=? AND date=?",
         (roll, today)
     )
     exists = cursor.fetchone()
 
     if exists:
         cursor.close()
-        db.close()
+        conn.close()
         return jsonify({"message": f"{name} already marked today"}), 200
 
     cursor.execute(
-        "INSERT INTO attendance (name, roll, date, time) VALUES (%s, %s, %s, NOW())",
-        (name, roll, today)
+        "INSERT INTO attendance (name, roll, date, time) VALUES (?, ?, ?, ?)",
+        (name, roll, today, now_time)
     )
-    db.commit()
+    conn.commit()
 
     cursor.close()
-    db.close()
+    conn.close()
 
     return jsonify({"message": f"{name} marked present"}), 200
 
@@ -195,16 +196,17 @@ def mark_attendance():
 # ================================
 @app.route('/attendance-history', methods=['GET'])
 def attendance_history():
-    db = get_db()
-    cursor = db.cursor()
+    conn = get_db()
+    cursor = conn.cursor()
 
     cursor.execute("SELECT * FROM attendance ORDER BY date DESC")
     rows = cursor.fetchall()
 
     cursor.close()
-    db.close()
+    conn.close()
 
-    return jsonify(rows)
+    history = [dict(row) for row in rows]
+    return jsonify(history)
 
 
 # ================================
@@ -212,21 +214,21 @@ def attendance_history():
 # ================================
 @app.route('/dashboard-stats', methods=['GET'])
 def dashboard_stats():
-    db = get_db()
-    cursor = db.cursor()
+    conn = get_db()
+    cursor = conn.cursor()
 
     cursor.execute("SELECT COUNT(*) AS total FROM students")
     total_students = cursor.fetchone()["total"]
 
     today = datetime.datetime.now().strftime("%Y-%m-%d")
 
-    cursor.execute("SELECT COUNT(*) AS present FROM attendance WHERE date=%s", (today,))
+    cursor.execute("SELECT COUNT(*) AS present FROM attendance WHERE date=?", (today,))
     todays_attendance = cursor.fetchone()["present"]
 
     absent = total_students - todays_attendance
 
     cursor.close()
-    db.close()
+    conn.close()
 
     return jsonify({
         "success": True,
@@ -327,6 +329,7 @@ def train_lbph_model():
     if data is None or labels is None or label_to_roll is None:
         return None, None
 
+    # Requires opencv-contrib-python
     recognizer = cv2.face.LBPHFaceRecognizer_create()
     recognizer.train(data, labels)
     return recognizer, label_to_roll
@@ -337,40 +340,41 @@ def mark_attendance_in_db(roll):
     Helper: mark attendance for given roll by looking up student name.
     """
     today = datetime.datetime.now().strftime("%Y-%m-%d")
+    now_time = datetime.datetime.now().strftime("%H:%M:%S")
 
-    db = get_db()
-    cursor = db.cursor()
+    conn = get_db()
+    cursor = conn.cursor()
 
     # find student
-    cursor.execute("SELECT * FROM students WHERE roll=%s", (roll,))
+    cursor.execute("SELECT * FROM students WHERE roll=?", (roll,))
     student = cursor.fetchone()
     if not student:
         cursor.close()
-        db.close()
+        conn.close()
         return False, "Student not found"
 
     name = student["name"]
 
     # check if already marked
     cursor.execute(
-        "SELECT * FROM attendance WHERE roll=%s AND date=%s",
+        "SELECT * FROM attendance WHERE roll=? AND date=?",
         (roll, today)
     )
     exists = cursor.fetchone()
     if exists:
         cursor.close()
-        db.close()
+        conn.close()
         return True, f"{name} already marked today"
 
     # insert
     cursor.execute(
-        "INSERT INTO attendance (name, roll, date, time) VALUES (%s, %s, %s, NOW())",
-        (name, roll, today)
+        "INSERT INTO attendance (name, roll, date, time) VALUES (?, ?, ?, ?)",
+        (name, roll, today, now_time)
     )
-    db.commit()
+    conn.commit()
 
     cursor.close()
-    db.close()
+    conn.close()
     return True, f"{name} marked present"
 
 
@@ -395,12 +399,12 @@ def upload_face():
         return jsonify({"success": False, "message": "Invalid image data"}), 400
 
     # ensure student exists
-    db = get_db()
-    cursor = db.cursor()
-    cursor.execute("SELECT * FROM students WHERE roll=%s", (roll,))
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM students WHERE roll=?", (roll,))
     student = cursor.fetchone()
     cursor.close()
-    db.close()
+    conn.close()
 
     if not student:
         return jsonify({"success": False, "message": "Student not found for this roll"}), 404
@@ -467,12 +471,12 @@ def recognize_face():
     ok, msg = mark_attendance_in_db(roll)
 
     # fetch name again for response
-    db = get_db()
-    cursor = db.cursor()
-    cursor.execute("SELECT * FROM students WHERE roll=%s", (roll,))
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM students WHERE roll=?", (roll,))
     student = cursor.fetchone()
     cursor.close()
-    db.close()
+    conn.close()
 
     name = student["name"] if student else None
 
@@ -484,32 +488,57 @@ def recognize_face():
         "message": msg
     }), 200
 
-#temp
-@app.route('/env')
-def env_test():
-    return {
-        "MYSQLHOST": os.getenv("MYSQLHOST"),
-        "MYSQLUSER": os.getenv("MYSQLUSER"),
-        "MYSQLPASSWORD": os.getenv("MYSQLPASSWORD"),
-        "MYSQLDATABASE": os.getenv("MYSQLDATABASE"),
-        "MYSQLPORT": os.getenv("MYSQLPORT")
-    }
 
-#temp
-@app.route("/tables")
-def tables():
-    try:
-        cursor = conn.cursor()
-        cursor.execute("SHOW TABLES;")
-        result = cursor.fetchall()
-        return {"tables": result}
-    except Exception as e:
-        return {"error": str(e)}
+# ================================
+# 🔧 INIT DB (CREATE TABLES)
+# ================================
+def init_db():
+    conn = get_db()
+    cursor = conn.cursor()
 
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS admins (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            email TEXT UNIQUE,
+            password TEXT
+        )
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS teachers (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            email TEXT UNIQUE,
+            password TEXT
+        )
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS students (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT,
+            roll TEXT UNIQUE,
+            branch TEXT
+        )
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS attendance (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT,
+            roll TEXT,
+            date TEXT,
+            time TEXT
+        )
+    """)
+
+    conn.commit()
+    conn.close()
+    print("Tables created successfully!")
 
 
 # ================================
 # 🚀 RUN SERVER (LOCAL)
 # ================================
 if __name__ == '__main__':
+    init_db()
     app.run(debug=True, port=5000)
