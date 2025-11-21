@@ -16,16 +16,14 @@ CORS(app)
 # ================================
 def get_db():
     return pymysql.connect(
-        host=os.getenv("MYSQLHOST"),
-        user=os.getenv("MYSQLUSER"),
+        host=os.getenv("MYSQLHOST"),       # ballast.proxy.rlwy.net
+        user=os.getenv("MYSQLUSER"),       # root
         password=os.getenv("MYSQLPASSWORD"),
         database=os.getenv("MYSQLDATABASE"),
-        port=int(os.getenv("MYSQLPORT")),
+        port=int(os.getenv("MYSQLPORT")),  # 15730
         cursorclass=pymysql.cursors.DictCursor,
-        ssl={"ssl": {}}  # required for Railway
+        ssl={"ssl": {}}   # required for Railway external connections
     )
-
-
 
 
 # ================================
