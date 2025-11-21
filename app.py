@@ -13,8 +13,7 @@ CORS(app)
 
 DB_PATH = "database.db"
 
-with app.app_context():
-    init_db()
+
 
 
 # ================================
@@ -452,7 +451,9 @@ def init_db():
     conn.commit()
     conn.close()
     print("Tables created successfully!")
-
+    
+with app.app_context():
+    init_db()
 
 # ================================
 # 🚀 RUN SERVER (LOCAL)
