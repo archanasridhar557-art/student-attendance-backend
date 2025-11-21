@@ -406,6 +406,38 @@ def recognize_face():
 print("Using DB at:", os.path.abspath(DB_PATH))#remove
 
 # ================================
+# 🌱 SEED DEFAULT ADMIN & TEACHER
+# ================================
+@app.route('/seed-users', methods=['POST'])
+def seed_users():
+    conn = get_db()
+    cursor = conn.cursor()
+
+    # default admin
+    cursor.execute(
+        "INSERT OR IGNORE INTO admins (email, password) VALUES (?, ?)",
+        ("admin@gmail.com", "admin123")
+    )
+
+    # default teacher
+    cursor.execute(
+        "INSERT OR IGNORE INTO teachers (email, password) VALUES (?, ?)",
+        ("teacher@gmail.com", "teacher123")
+    )
+
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+    return jsonify({
+        "success": True,
+        "message": "Default admin and teacher created (if they didn't already exist).",
+        "admin": {"email": "admin@gmail.com", "password": "admin123"},
+        "teacher": {"email": "teacher@gmail.com", "password": "teacher123"}
+    }), 200
+
+
+# ================================
 # 🔧 INIT DB (CREATE TABLES)
 # ================================
 
@@ -451,7 +483,7 @@ def init_db():
     conn.commit()
     conn.close()
     print("Tables created successfully!")
-    
+
 with app.app_context():
     init_db()
 
