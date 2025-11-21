@@ -16,14 +16,18 @@ CORS(app)
 # ================================
 def get_db():
     return pymysql.connect(
-        host=os.getenv("MYSQLHOST"),       # ballast.proxy.rlwy.net
-        user=os.getenv("MYSQLUSER"),       # root
+        host=os.getenv("MYSQLHOST"),
+        user=os.getenv("MYSQLUSER"),
         password=os.getenv("MYSQLPASSWORD"),
         database=os.getenv("MYSQLDATABASE"),
-        port=int(os.getenv("MYSQLPORT")),  # 15730
+        port=int(os.getenv("MYSQLPORT")),
         cursorclass=pymysql.cursors.DictCursor,
-        ssl={"ssl": {}}   # required for Railway external connections
+        ssl={"ssl": {}},                      # Needed for Railway
+        auth_plugin_map={
+            "*": "mysql_native_password"      # Fixes caching_sha2_password error
+        }
     )
+
 
 
 # ================================
